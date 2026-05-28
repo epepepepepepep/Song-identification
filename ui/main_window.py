@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Qt, Signal
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -294,14 +295,14 @@ class MainWindow(QMainWindow):
         except ValueError:
             return Path(file_path).name
 
-    def dragEnterEvent(self, event) -> None:  # type: ignore[override]
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         mime = event.mimeData()
         if mime.hasUrls():
             event.acceptProposedAction()
             return
         event.ignore()
 
-    def dropEvent(self, event) -> None:  # type: ignore[override]
+    def dropEvent(self, event: QDropEvent) -> None:
         urls = event.mimeData().urls()
         if not urls:
             event.ignore()

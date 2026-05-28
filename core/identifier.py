@@ -1,15 +1,12 @@
 import json
+import logging
 import subprocess
 from pathlib import Path
 from typing import Any
 
 import requests
 import urllib3
-
-try:
-    import yt_dlp
-except ImportError:  # pragma: no cover - optional dependency at runtime
-    yt_dlp = None
+import yt_dlp
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -19,6 +16,7 @@ ACOUSTID_URL = "https://api.acoustid.org/v2/lookup"
 MUSICBRAINZ_URL = "https://musicbrainz.org/ws/2/recording/{recording_id}"
 REQUEST_TIMEOUT = 30
 YOUTUBE_SEARCH_LIMIT = 3
+logger = logging.getLogger(__name__)
 
 
 class IdentifierError(Exception):
@@ -181,9 +179,6 @@ def identify_song(file_path: str) -> dict[str, str]:
 
 
 def search_youtube_video(artist: str, title: str) -> dict[str, str]:
-    if yt_dlp is None:
-        return {}
-
     query = " ".join(part for part in [artist.strip(), title.strip()] if part).strip()
     if not query:
         return {}
@@ -198,6 +193,7 @@ def search_youtube_video(artist: str, title: str) -> dict[str, str]:
         ) as ydl:
             results = ydl.extract_info(f"ytsearch{YOUTUBE_SEARCH_LIMIT}:{query}", download=False) or {}
     except Exception:
+        logger.debug("YouTube search failed", exc_info=True)
         return {}
 
     entries = results.get("entries") or []
