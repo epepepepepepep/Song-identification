@@ -6,6 +6,11 @@ from typing import Any
 import requests
 import urllib3
 
+try:
+    import yt_dlp
+except ImportError:  # pragma: no cover - optional dependency at runtime
+    yt_dlp = None
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -170,7 +175,43 @@ def identify_song(file_path: str) -> dict[str, str]:
     recording_id = str(recordings[0].get("id", ""))
     metadata = fetch_musicbrainz_metadata(recording_id)
     metadata["score"] = f"{float(best.get('score', 0) or 0):.2f}"
+    metadata.update(search_youtube_video(metadata.get("artist", ""), metadata.get("title", "")))
     return metadata
+
+
+def search_youtube_video(artist: str, title: str) -> dict[str, str]:
+    if yt_dlp is None:
+        return {}
+
+    query = " ".join(part for part in [artist.strip(), title.strip()] if part).strip()
+    if not query:
+        return {}
+
+    try:
+        with yt_dlp.YoutubeDL(
+            {
+                "quiet": True,
+                "skip_download": True,
+                "nocheckcertificate": True,
+            }
+        ) as ydl:
+            results = ydl.extract_info(f"ytsearch3:{query}", download=False) or {}
+    except Exception:
+        return {}
+
+    entries = results.get("entries") or []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        youtube_title = str(entry.get("title") or "").strip()
+        youtube_url = str(entry.get("webpage_url") or "").strip()
+        if not youtube_url:
+            video_id = str(entry.get("id") or "").strip()
+            if video_id:
+                youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+        if youtube_url:
+            return {"youtube_title": youtube_title, "youtube_url": youtube_url}
+    return {}
 
 
 def _join_artists(artist_credit: list[Any]) -> str:
