@@ -1,13 +1,16 @@
 import json
 import os
-import sys
+import ssl
+import urllib.request
 from pathlib import Path
 from typing import Any
 
 import acoustid
 import musicbrainzngs
 import requests
+import urllib3
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.json"
 ACOUSTID_TIMEOUT = 25
@@ -25,7 +28,6 @@ def _find_fpcalc() -> str:
     for candidate in _FPCALC_CANDIDATES:
         if candidate.exists():
             return str(candidate)
-    # נסה מה-PATH
     return "fpcalc"
 
 
@@ -48,13 +50,11 @@ def _load_acoustid_key() -> str:
 
 def create_fingerprint(file_path: str) -> tuple[int, str]:
     fpcalc_path = _find_fpcalc()
-    # הגדר את נתיב fpcalc עבור pyacoustid
-    os.environ.setdefault("FPCALC", fpcalc_path)
+    os.environ["FPCALC"] = fpcalc_path
     try:
         duration, fingerprint = acoustid.fingerprint_file(file_path, force_fpcalc=True)
         return duration, fingerprint
     except TypeError:
-        # גרסאות ישנות של pyacoustid ללא force_fpcalc
         try:
             duration, fingerprint = acoustid.fingerprint_file(file_path)
             return duration, fingerprint
@@ -79,6 +79,7 @@ def lookup_acoustid(fingerprint: str, duration: int) -> list[dict[str, Any]]:
                 "format": "json",
             },
             timeout=ACOUSTID_TIMEOUT,
+            verify=False,
         )
         response.raise_for_status()
         payload = response.json()
@@ -92,6 +93,16 @@ def lookup_acoustid(fingerprint: str, duration: int) -> list[dict[str, Any]]:
 
 
 def fetch_musicbrainz_metadata(recording_id: str) -> dict[str, str]:
+    # עקוף בדיקת SSL עבור MusicBrainz
+    _orig_create_default_context = ssl.create_default_context
+
+    def _no_verify_context(*args, **kwargs):
+        ctx = _orig_create_default_context(*args, **kwargs)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+
+    ssl.create_default_context = _no_verify_context
     try:
         musicbrainzngs.set_useragent(
             "song-identification",
@@ -108,6 +119,8 @@ def fetch_musicbrainz_metadata(recording_id: str) -> dict[str, str]:
         musicbrainzngs.NetworkError,
     ) as exc:
         raise IdentifierError("שגיאה במשיכת מטא-דאטה מ-MusicBrainz") from exc
+    finally:
+        ssl.create_default_context = _orig_create_default_context
 
     recording = data.get("recording", {})
     artists = recording.get("artist-credit", [])
