@@ -3,3 +3,4 @@ mutagen
 pyacoustid
 musicbrainzngs
 requests
+yt-dlp

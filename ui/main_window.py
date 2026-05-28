@@ -1,6 +1,8 @@
+import os
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Qt, Signal
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -17,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.scanner import SUPPORTED_EXTENSIONS, scan_folder
 from core.identifier import IdentifierError, identify_song
 from core.metadata_writer import MetadataWriteError, build_metadata_preview, write_mp3_metadata
 from ui.result_widget import ResultWidget
@@ -50,10 +53,12 @@ class MainWindow(QMainWindow):
         self.setLayoutDirection(Qt.RightToLeft)
 
         self.selected_files: list[str] = []
+        self.selected_base_dir: Path | None = None
         self.result_widgets: dict[str, ResultWidget] = {}
         self.worker: IdentifyWorker | None = None
 
         self._build_ui()
+        self.setAcceptDrops(True)
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -61,12 +66,15 @@ class MainWindow(QMainWindow):
 
         controls = QHBoxLayout()
         self.select_button = QPushButton("בחר קבצים")
+        self.select_folder_button = QPushButton("בחר תיקייה")
         self.identify_button = QPushButton("זהה והוסף מטא-דאטה")
         self.save_all_button = QPushButton("שמור הכל")
         self.select_button.clicked.connect(self.select_files)
+        self.select_folder_button.clicked.connect(self.select_folder)
         self.identify_button.clicked.connect(self.identify_selected)
         self.save_all_button.clicked.connect(self.save_all)
         controls.addWidget(self.select_button)
+        controls.addWidget(self.select_folder_button)
         controls.addWidget(self.identify_button)
         controls.addWidget(self.save_all_button)
         controls.addStretch()
@@ -111,21 +119,20 @@ class MainWindow(QMainWindow):
         if not files:
             return
 
-        self.selected_files = files
-        self.table.setRowCount(0)
-        self._clear_results_widgets()
+        self._load_files(files)
 
-        for file_path in files:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            file_item = QTableWidgetItem(Path(file_path).name)
-            file_item.setData(Qt.ItemDataRole.UserRole, file_path)
-            self.table.setItem(row, 0, file_item)
-            self.table.setItem(row, 1, QTableWidgetItem("ממתין לזיהוי"))
+    def select_folder(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "בחר תיקייה")
+        if not folder:
+            return
 
-        self.progress.setMaximum(len(files))
-        self.progress.setValue(0)
-        self.status_label.setText(f"נבחרו {len(files)} קבצים")
+        files = scan_folder(folder)
+        if not files:
+            QMessageBox.information(self, "מידע", "לא נמצאו קבצי אודיו בתיקייה שנבחרה")
+            return
+
+        self._load_files(files, Path(folder))
+        self.status_label.setText(f"נבחרה תיקייה עם {len(files)} קבצים")
 
     def identify_selected(self) -> None:
         if not self.selected_files:
@@ -252,3 +259,81 @@ class MainWindow(QMainWindow):
         widget = self.result_widgets.get(file_path)
         if widget:
             widget.set_status(status)
+
+    def _load_files(self, files: list[str], base_dir: Path | None = None) -> None:
+        self.selected_files = files
+        self.selected_base_dir = base_dir or self._common_base_dir(files)
+        self.table.setRowCount(0)
+        self._clear_results_widgets()
+
+        for file_path in files:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            file_item = QTableWidgetItem(self._display_path(file_path))
+            file_item.setData(Qt.ItemDataRole.UserRole, file_path)
+            self.table.setItem(row, 0, file_item)
+            self.table.setItem(row, 1, QTableWidgetItem("ממתין לזיהוי"))
+
+        self.progress.setMaximum(len(files))
+        self.progress.setValue(0)
+        self.status_label.setText(f"נבחרו {len(files)} קבצים")
+
+    def _common_base_dir(self, files: list[str]) -> Path | None:
+        if not files:
+            return None
+        try:
+            common_path = Path(os.path.commonpath(files))
+        except ValueError:
+            return None
+        return common_path if common_path.is_dir() else common_path.parent
+
+    def _display_path(self, file_path: str) -> str:
+        if self.selected_base_dir is None:
+            return Path(file_path).name
+        try:
+            return Path(file_path).resolve().relative_to(self.selected_base_dir.resolve()).as_posix()
+        except ValueError:
+            return Path(file_path).name
+
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        mime = event.mimeData()
+        if mime.hasUrls():
+            event.acceptProposedAction()
+            return
+        event.ignore()
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        urls = event.mimeData().urls()
+        if not urls:
+            event.ignore()
+            return
+
+        local_paths = [Path(url.toLocalFile()) for url in urls if url.isLocalFile()]
+        selected: list[str] = []
+        base_candidates: list[str] = []
+
+        for path in local_paths:
+            if path.is_dir():
+                base_candidates.append(str(path))
+                selected.extend(scan_folder(str(path)))
+                continue
+            if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
+                selected.append(str(path))
+                base_candidates.append(str(path.parent))
+
+        selected = list(dict.fromkeys(selected))
+        if not selected:
+            QMessageBox.information(self, "מידע", "לא נמצאו קבצי אודיו בתיקיות שנגררו")
+            event.ignore()
+            return
+
+        base_dir = None
+        if base_candidates:
+            try:
+                common = Path(os.path.commonpath(base_candidates))
+            except ValueError:
+                common = None
+            if common is not None:
+                base_dir = common if common.is_dir() else common.parent
+        self._load_files(selected, base_dir)
+        event.acceptProposedAction()

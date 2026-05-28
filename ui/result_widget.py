@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QUrl, Qt, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
@@ -30,6 +31,10 @@ class ResultWidget(QGroupBox):
         self.genre_edit = QLineEdit(metadata.get("genre", ""))
         self.track_edit = QLineEdit(metadata.get("track", ""))
         self.score_label = QLabel(metadata.get("score", "0.00"))
+        self.youtube_title_edit = QLineEdit(metadata.get("youtube_title", ""))
+        self.youtube_url_edit = QLineEdit(metadata.get("youtube_url", ""))
+        self.youtube_title_edit.setReadOnly(True)
+        self.youtube_url_edit.setReadOnly(True)
 
         form.addRow("שם שיר:", self.title_edit)
         form.addRow("אמן:", self.artist_edit)
@@ -38,13 +43,19 @@ class ResultWidget(QGroupBox):
         form.addRow("ז'אנר:", self.genre_edit)
         form.addRow("מספר רצועה:", self.track_edit)
         form.addRow("ציון התאמה:", self.score_label)
+        form.addRow("שם סרטון ביוטיוב:", self.youtube_title_edit)
+        form.addRow("קישור יוטיוב:", self.youtube_url_edit)
 
         actions = QHBoxLayout()
         self.status_label = QLabel("מוכן לשמירה")
         self.save_button = QPushButton("שמור מטא-דאטה")
+        self.open_youtube_button = QPushButton("פתח ביוטיוב")
         self.save_button.clicked.connect(self._emit_save)
+        self.open_youtube_button.clicked.connect(self._open_youtube)
+        self.open_youtube_button.setEnabled(bool(self.youtube_url_edit.text().strip()))
         actions.addWidget(self.status_label)
         actions.addStretch()
+        actions.addWidget(self.open_youtube_button)
         actions.addWidget(self.save_button)
 
         root.addLayout(form)
@@ -59,6 +70,8 @@ class ResultWidget(QGroupBox):
             "genre": self.genre_edit.text().strip(),
             "track": self.track_edit.text().strip(),
             "score": self.score_label.text().strip(),
+            "youtube_title": self.youtube_title_edit.text().strip(),
+            "youtube_url": self.youtube_url_edit.text().strip(),
         }
 
     def set_status(self, text: str) -> None:
@@ -66,3 +79,9 @@ class ResultWidget(QGroupBox):
 
     def _emit_save(self) -> None:
         self.save_requested.emit(self.file_path, self.metadata())
+
+    def _open_youtube(self) -> None:
+        url = self.youtube_url_edit.text().strip()
+        if not url:
+            return
+        QDesktopServices.openUrl(QUrl(url))

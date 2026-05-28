@@ -1,10 +1,12 @@
 import json
+import logging
 import subprocess
 from pathlib import Path
 from typing import Any
 
 import requests
 import urllib3
+import yt_dlp
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -13,6 +15,8 @@ CONFIG_PATH = PROJECT_ROOT / "config.json"
 ACOUSTID_URL = "https://api.acoustid.org/v2/lookup"
 MUSICBRAINZ_URL = "https://musicbrainz.org/ws/2/recording/{recording_id}"
 REQUEST_TIMEOUT = 30
+YOUTUBE_SEARCH_LIMIT = 3
+logger = logging.getLogger(__name__)
 
 
 class IdentifierError(Exception):
@@ -170,7 +174,41 @@ def identify_song(file_path: str) -> dict[str, str]:
     recording_id = str(recordings[0].get("id", ""))
     metadata = fetch_musicbrainz_metadata(recording_id)
     metadata["score"] = f"{float(best.get('score', 0) or 0):.2f}"
+    metadata.update(search_youtube_video(metadata.get("artist", ""), metadata.get("title", "")))
     return metadata
+
+
+def search_youtube_video(artist: str, title: str) -> dict[str, str]:
+    query = " ".join(part for part in [artist.strip(), title.strip()] if part).strip()
+    if not query:
+        return {}
+
+    try:
+        with yt_dlp.YoutubeDL(
+            {
+                "quiet": True,
+                "skip_download": True,
+                "nocheckcertificate": True,
+            }
+        ) as ydl:
+            results = ydl.extract_info(f"ytsearch{YOUTUBE_SEARCH_LIMIT}:{query}", download=False) or {}
+    except Exception:
+        logger.debug("YouTube search failed", exc_info=True)
+        return {}
+
+    entries = results.get("entries") or []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        youtube_title = str(entry.get("title") or "").strip()
+        youtube_url = str(entry.get("webpage_url") or "").strip()
+        if not youtube_url:
+            video_id = str(entry.get("id") or "").strip()
+            if video_id:
+                youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+        if youtube_url:
+            return {"youtube_title": youtube_title, "youtube_url": youtube_url}
+    return {}
 
 
 def _join_artists(artist_credit: list[Any]) -> str:
