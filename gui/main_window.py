@@ -255,11 +255,22 @@ class MainWindow(QMainWindow):
             try:
                 before = read_tags(file_path)
                 if self.chk_backup.isChecked():
-                    backup_path = backup_file(file_path)
+                    try:
+                        backup_path = backup_file(file_path)
+                    except Exception as exc:  # noqa: BLE001
+                        raise RuntimeError(f"שגיאה ביצירת גיבוי: {exc}") from exc
                     log_change(f"נוצר גיבוי: {backup_path}")
 
-                write_tags(file_path, data)
-                renamed = rename_file(file_path, data.get("artist", ""), data.get("title", ""))
+                try:
+                    write_tags(file_path, data)
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(f"שגיאה בכתיבת תגיות: {exc}") from exc
+
+                try:
+                    renamed = rename_file(file_path, data.get("artist", ""), data.get("title", ""))
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(f"שגיאה בשינוי שם קובץ: {exc}") from exc
+
                 after = read_tags(renamed)
 
                 data["file_path"] = renamed

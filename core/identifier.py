@@ -8,6 +8,7 @@ import requests
 
 
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.json"
+ACOUSTID_TIMEOUT = 25
 
 
 class IdentifierError(Exception):
@@ -48,7 +49,7 @@ def lookup_acoustid(fingerprint: str, duration: int) -> list[dict[str, Any]]:
                 "meta": "recordings",
                 "format": "json",
             },
-            timeout=25,
+            timeout=ACOUSTID_TIMEOUT,
         )
         response.raise_for_status()
         payload = response.json()

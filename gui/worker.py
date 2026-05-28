@@ -54,8 +54,18 @@ class ScanWorker(QThread):
         }
 
         try:
-            duration, fingerprint = create_fingerprint(file_path)
-            matches = lookup_acoustid(fingerprint, duration)
+            try:
+                duration, fingerprint = create_fingerprint(file_path)
+            except Exception as exc:  # noqa: BLE001
+                result["error"] = f"שגיאה בשלב יצירת fingerprint: {exc}"
+                return result
+
+            try:
+                matches = lookup_acoustid(fingerprint, duration)
+            except Exception as exc:  # noqa: BLE001
+                result["error"] = f"שגיאה בשלב חיפוש ב-AcoustID: {exc}"
+                return result
+
             if not matches:
                 result["error"] = "לא נמצאו התאמות"
                 return result
@@ -69,7 +79,11 @@ class ScanWorker(QThread):
 
             recording = recordings[0]
             recording_id = recording.get("id", "")
-            metadata = fetch_musicbrainz_metadata(recording_id) if recording_id else {}
+            try:
+                metadata = fetch_musicbrainz_metadata(recording_id) if recording_id else {}
+            except Exception as exc:  # noqa: BLE001
+                result["error"] = f"שגיאה בשלב משיכת נתונים מ-MusicBrainz: {exc}"
+                return result
 
             result.update(
                 {

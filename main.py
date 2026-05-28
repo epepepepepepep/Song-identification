@@ -54,6 +54,10 @@ def ensure_acoustid_key() -> dict:
 
 
 def main() -> None:
+    if sys.version_info < (3, 10):
+        print("נדרשת גרסת Python 3.10 ומעלה.")
+        raise SystemExit(1)
+
     app = QApplication(sys.argv)
     app.setLayoutDirection(Qt.RightToLeft)
     app.setFont(QFont("Arial", 10))
