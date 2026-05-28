@@ -61,4 +61,4 @@ def rename_file(file_path: str, artist: str, title: str) -> str:
 
 
 def _safe_name(text: str) -> str:
-    return re.sub(r"[\\/:*?\"<>|]", "_", text).strip() or "Unknown"
+    return re.sub(r"[\\/:*?\"<>|]", "_", text).strip() or "לא_ידוע"

@@ -28,14 +28,20 @@ def save_config(config: dict) -> None:
 
 
 def ensure_acoustid_key() -> dict:
+    config_exists = CONFIG_PATH.exists()
     config = load_config()
     if config.get("acoustid_api_key"):
         return config
 
+    prompt = (
+        "לא נמצא קובץ הגדרות. הזן מפתח API של AcoustID:"
+        if not config_exists
+        else "לא נמצא מפתח API בקובץ ההגדרות. הזן מפתח AcoustID:"
+    )
     key, ok = QInputDialog.getText(
         None,
         "מפתח AcoustID",
-        "לא נמצא קובץ הגדרות. הזן מפתח API של AcoustID:",
+        prompt,
     )
     if not ok or not key.strip():
         QMessageBox.critical(None, "שגיאה", "לא הוזן מפתח API. התוכנה תיסגר.")

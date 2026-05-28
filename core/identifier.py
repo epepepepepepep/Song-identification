@@ -32,7 +32,8 @@ def create_fingerprint(file_path: str) -> tuple[int, str]:
         duration, fingerprint = acoustid.fingerprint_file(file_path)
         return duration, fingerprint
     except Exception as exc:  # noqa: BLE001
-        raise IdentifierError(f"נכשל יצירת fingerprint עבור הקובץ: {file_path}") from exc
+        file_name = Path(file_path).name
+        raise IdentifierError(f"נכשל יצירת fingerprint עבור הקובץ: {file_name}") from exc
 
 
 def lookup_acoustid(fingerprint: str, duration: int) -> list[dict[str, Any]]:

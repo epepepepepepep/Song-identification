@@ -87,7 +87,7 @@ class ScanWorker(QThread):
         except IdentifierError as exc:
             result["error"] = str(exc)
         except Exception as exc:  # noqa: BLE001
-            result["error"] = f"שגיאה לא צפויה: {exc}"
+            result["error"] = f"שגיאה לא צפויה ({type(exc).__name__}): {exc}"
 
         return result
 
