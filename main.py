@@ -50,7 +50,7 @@ def ensure_acoustid_key() -> dict:
 def main() -> None:
     app = QApplication(sys.argv)
     app.setLayoutDirection(Qt.RightToLeft)
-    app.setFont(QFont("Segoe UI", 10))
+    app.setFont(QFont("Arial", 10))
 
     ensure_acoustid_key()
 

@@ -44,8 +44,8 @@ def write_tags(file_path: str, metadata: dict[str, Any]) -> None:
 
 def rename_file(file_path: str, artist: str, title: str) -> str:
     source = Path(file_path)
-    clean_artist = _safe_name(artist or "Unknown Artist")
-    clean_title = _safe_name(title or "Unknown Title")
+    clean_artist = _safe_name(artist or "אמן לא ידוע")
+    clean_title = _safe_name(title or "שם לא ידוע")
     target = source.with_name(f"{clean_artist} - {clean_title}{source.suffix}")
 
     if source.resolve() == target.resolve():

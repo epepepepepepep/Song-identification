@@ -241,6 +241,7 @@ class MainWindow(QMainWindow):
             return
 
         applied = 0
+        failures: list[str] = []
         for row, data in enumerate(self.row_data):
             approve_item = self.table.item(row, 7)
             approved = approve_item is not None and approve_item.checkState() == Qt.Checked
@@ -270,6 +271,18 @@ class MainWindow(QMainWindow):
                 applied += 1
             except Exception as exc:  # noqa: BLE001
                 log_change(f"שגיאה בעדכון הקובץ {file_path}: {exc}")
+                failures.append(f"{Path(file_path).name}: {exc}")
+
+        if failures:
+            QMessageBox.warning(
+                self,
+                "חלק מהעדכונים נכשלו",
+                "הפעולה הושלמה חלקית.\n"
+                f"עודכנו {applied} קבצים.\n"
+                f"נכשלו {len(failures)} קבצים:\n- " + "\n- ".join(failures[:8]),
+            )
+            self.status_label.setText("הפעולה הושלמה חלקית")
+            return
 
         QMessageBox.information(self, "סיום", f"הפעולה הושלמה. עודכנו {applied} קבצים")
 
