@@ -54,54 +54,49 @@ class ScanWorker(QThread):
         }
 
         try:
-            try:
-                duration, fingerprint = create_fingerprint(file_path)
-            except Exception as exc:  # noqa: BLE001
-                result["error"] = f"שגיאה בשלב יצירת fingerprint: {exc}"
-                return result
-
-            try:
-                matches = lookup_acoustid(fingerprint, duration)
-            except Exception as exc:  # noqa: BLE001
-                result["error"] = f"שגיאה בשלב חיפוש ב-AcoustID: {exc}"
-                return result
-
-            if not matches:
-                result["error"] = "לא נמצאו התאמות"
-                return result
-
-            best = max(matches, key=lambda item: item.get("score", 0))
-            score = float(best.get("score", 0.0))
-            recordings = best.get("recordings", [])
-            if not recordings:
-                result["error"] = "אין הקלטה מתאימה"
-                return result
-
-            recording = recordings[0]
-            recording_id = recording.get("id", "")
-            try:
-                metadata = fetch_musicbrainz_metadata(recording_id) if recording_id else {}
-            except Exception as exc:  # noqa: BLE001
-                result["error"] = f"שגיאה בשלב משיכת נתונים מ-MusicBrainz: {exc}"
-                return result
-
-            result.update(
-                {
-                    "title": metadata.get("title") or recording.get("title", ""),
-                    "artist": metadata.get("artist", ""),
-                    "album": metadata.get("album", ""),
-                    "date": metadata.get("date", ""),
-                    "tracknumber": metadata.get("tracknumber", ""),
-                    "genre": metadata.get("genre", ""),
-                    "confidence": score,
-                    "status": self._status_from_score(score),
-                    "approved": score >= 0.85,
-                }
-            )
+            duration, fingerprint = create_fingerprint(file_path)
         except IdentifierError as exc:
-            result["error"] = str(exc)
-        except Exception as exc:  # noqa: BLE001
-            result["error"] = f"שגיאה לא צפויה ({type(exc).__name__}): {exc}"
+            result["error"] = f"שגיאה בשלב יצירת fingerprint: {exc}"
+            return result
+
+        try:
+            matches = lookup_acoustid(fingerprint, duration)
+        except IdentifierError as exc:
+            result["error"] = f"שגיאה בשלב חיפוש ב-AcoustID: {exc}"
+            return result
+
+        if not matches:
+            result["error"] = "לא נמצאו התאמות"
+            return result
+
+        best = max(matches, key=lambda item: item.get("score", 0))
+        score = float(best.get("score", 0.0))
+        recordings = best.get("recordings", [])
+        if not recordings:
+            result["error"] = "אין הקלטה מתאימה"
+            return result
+
+        recording = recordings[0]
+        recording_id = recording.get("id", "")
+        try:
+            metadata = fetch_musicbrainz_metadata(recording_id) if recording_id else {}
+        except IdentifierError as exc:
+            result["error"] = f"שגיאה בשלב משיכת נתונים מ-MusicBrainz: {exc}"
+            return result
+
+        result.update(
+            {
+                "title": metadata.get("title") or recording.get("title", ""),
+                "artist": metadata.get("artist", ""),
+                "album": metadata.get("album", ""),
+                "date": metadata.get("date", ""),
+                "tracknumber": metadata.get("tracknumber", ""),
+                "genre": metadata.get("genre", ""),
+                "confidence": score,
+                "status": self._status_from_score(score),
+                "approved": score >= 0.85,
+            }
+        )
 
         return result
 

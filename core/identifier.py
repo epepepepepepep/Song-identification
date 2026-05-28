@@ -32,7 +32,7 @@ def create_fingerprint(file_path: str) -> tuple[int, str]:
     try:
         duration, fingerprint = acoustid.fingerprint_file(file_path)
         return duration, fingerprint
-    except Exception as exc:  # noqa: BLE001
+    except (OSError, acoustid.FingerprintGenerationError) as exc:
         file_name = Path(file_path).name
         raise IdentifierError(f"נכשל יצירת fingerprint עבור הקובץ: {file_name}") from exc
 
@@ -73,7 +73,11 @@ def fetch_musicbrainz_metadata(recording_id: str) -> dict[str, str]:
             recording_id,
             includes=["artists", "releases", "tags"],
         )
-    except Exception as exc:  # noqa: BLE001
+    except (
+        musicbrainzngs.WebServiceError,
+        musicbrainzngs.ResponseError,
+        musicbrainzngs.NetworkError,
+    ) as exc:
         raise IdentifierError("שגיאה במשיכת מטא-דאטה מ-MusicBrainz") from exc
 
     recording = data.get("recording", {})

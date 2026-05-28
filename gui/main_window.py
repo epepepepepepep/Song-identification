@@ -257,18 +257,18 @@ class MainWindow(QMainWindow):
                 if self.chk_backup.isChecked():
                     try:
                         backup_path = backup_file(file_path)
-                    except Exception as exc:  # noqa: BLE001
+                    except OSError as exc:
                         raise RuntimeError(f"שגיאה ביצירת גיבוי: {exc}") from exc
                     log_change(f"נוצר גיבוי: {backup_path}")
 
                 try:
                     write_tags(file_path, data)
-                except Exception as exc:  # noqa: BLE001
+                except (OSError, ValueError) as exc:
                     raise RuntimeError(f"שגיאה בכתיבת תגיות: {exc}") from exc
 
                 try:
                     renamed = rename_file(file_path, data.get("artist", ""), data.get("title", ""))
-                except Exception as exc:  # noqa: BLE001
+                except OSError as exc:
                     raise RuntimeError(f"שגיאה בשינוי שם קובץ: {exc}") from exc
 
                 after = read_tags(renamed)
@@ -280,7 +280,7 @@ class MainWindow(QMainWindow):
                     f"עודכן קובץ: {file_path} -> {renamed} | לפני: {before} | אחרי: {after}"
                 )
                 applied += 1
-            except Exception as exc:  # noqa: BLE001
+            except (RuntimeError, OSError, ValueError) as exc:
                 log_change(f"שגיאה בעדכון הקובץ {file_path}: {exc}")
                 failures.append(f"{Path(file_path).name}: {exc}")
 
