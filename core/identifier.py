@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +11,22 @@ import requests
 
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.json"
 ACOUSTID_TIMEOUT = 25
+
+# חפש fpcalc בתיקיית הפרויקט קודם, ואז ב-PATH
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_FPCALC_CANDIDATES = [
+    _PROJECT_ROOT / "fpcalc.exe",   # Windows בתיקיית הפרויקט
+    _PROJECT_ROOT / "fpcalc",       # Linux/macOS בתיקיית הפרויקט
+]
+
+
+def _find_fpcalc() -> str:
+    """מאתר את fpcalc — קודם בתיקיית הפרויקט, אחר כך ב-PATH."""
+    for candidate in _FPCALC_CANDIDATES:
+        if candidate.exists():
+            return str(candidate)
+    # נסה מה-PATH
+    return "fpcalc"
 
 
 class IdentifierError(Exception):
@@ -29,9 +47,20 @@ def _load_acoustid_key() -> str:
 
 
 def create_fingerprint(file_path: str) -> tuple[int, str]:
+    fpcalc_path = _find_fpcalc()
+    # הגדר את נתיב fpcalc עבור pyacoustid
+    os.environ.setdefault("FPCALC", fpcalc_path)
     try:
-        duration, fingerprint = acoustid.fingerprint_file(file_path)
+        duration, fingerprint = acoustid.fingerprint_file(file_path, force_fpcalc=True)
         return duration, fingerprint
+    except TypeError:
+        # גרסאות ישנות של pyacoustid ללא force_fpcalc
+        try:
+            duration, fingerprint = acoustid.fingerprint_file(file_path)
+            return duration, fingerprint
+        except (OSError, acoustid.FingerprintGenerationError) as exc:
+            file_name = Path(file_path).name
+            raise IdentifierError(f"נכשל יצירת fingerprint עבור הקובץ: {file_name}") from exc
     except (OSError, acoustid.FingerprintGenerationError) as exc:
         file_name = Path(file_path).name
         raise IdentifierError(f"נכשל יצירת fingerprint עבור הקובץ: {file_name}") from exc
