@@ -160,7 +160,6 @@ class MainWindow(QMainWindow):
             self.table.item(row, 1).setText(f"שגיאה: {error_text}")
 
     def _on_progress(self, current: int, total: int) -> None:
-        self.progress.setMaximum(max(total, 1))
         self.progress.setValue(current)
 
     def _on_identify_finished(self) -> None:

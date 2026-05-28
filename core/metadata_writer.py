@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
 
+from mutagen import MutagenError
 from mutagen.id3 import TALB, TCON, TDRC, TIT2, TPE1, TRCK, ID3, ID3NoHeaderError
 
 
@@ -68,5 +69,5 @@ def write_mp3_metadata(file_path: str, metadata: dict[str, Any]) -> None:
             tags.add(TRCK(encoding=3, text=clean["track"]))
 
         tags.save(file_path, v2_version=3)
-    except Exception as exc:  # noqa: BLE001
+    except (MutagenError, OSError, ValueError, TypeError) as exc:
         raise MetadataWriteError(f"נכשלה כתיבת מטא-דאטה: {exc}") from exc

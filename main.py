@@ -1,7 +1,7 @@
 import sys
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication
 
 from ui.main_window import MainWindow
 
@@ -13,12 +13,7 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setLayoutDirection(Qt.RightToLeft)
 
-    try:
-        window = MainWindow()
-    except Exception as exc:  # noqa: BLE001
-        QMessageBox.critical(None, "שגיאה", f"נכשלה פתיחת האפליקציה: {exc}")
-        raise SystemExit(1) from exc
-
+    window = MainWindow()
     window.show()
     sys.exit(app.exec())
 
