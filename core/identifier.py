@@ -18,6 +18,7 @@ CONFIG_PATH = PROJECT_ROOT / "config.json"
 ACOUSTID_URL = "https://api.acoustid.org/v2/lookup"
 MUSICBRAINZ_URL = "https://musicbrainz.org/ws/2/recording/{recording_id}"
 REQUEST_TIMEOUT = 30
+YOUTUBE_SEARCH_LIMIT = 3
 
 
 class IdentifierError(Exception):
@@ -195,7 +196,7 @@ def search_youtube_video(artist: str, title: str) -> dict[str, str]:
                 "nocheckcertificate": True,
             }
         ) as ydl:
-            results = ydl.extract_info(f"ytsearch3:{query}", download=False) or {}
+            results = ydl.extract_info(f"ytsearch{YOUTUBE_SEARCH_LIMIT}:{query}", download=False) or {}
     except Exception:
         return {}
 
